@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Geo-Spatial Matching Interface</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" crossorigin=""/>
+    <style>
+        body { font-family: 'Inter', Arial, sans-serif; margin: 0; padding: 0; background-color: #e9eef2; color: #333; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .top-bar { background-color: #2c3e50; color: white; padding: 10px 20px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 1000;}
+        .top-bar h1 { margin: 0; font-size: 1.5em; }
+        
+        .tab-container { display: flex; background-color: #34495e; padding: 0 10px; }
+        .tab-button { background-color: transparent; color: #bdc3c7; border: none; padding: 10px 15px; cursor: pointer; font-size: 1em; transition: background-color 0.2s, color 0.2s; border-bottom: 3px solid transparent; }
+        .tab-button.active { color: white; border-bottom: 3px solid #3498db; }
+        .tab-button:hover { background-color: #4a6572; color: white; }
+        
+        .tab-content { display: none; flex-grow: 1; overflow-y: auto; }
+        .tab-content.active { display: flex; /* Use flex for main content layout */ flex-direction: column; /* Default, can be overridden by children */ }
+
+        .main-layout { display: flex; flex-direction: row; flex-grow: 1; padding: 10px; gap: 10px; overflow: hidden; /* Prevent overall page scroll */ }
+        #map-view-content { display: flex; flex-direction: row; width: 100%; height: 100%; gap: 10px;}
+
+        #map { border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex-grow: 1; min-width: 0; height: 100%; }
+        .sidebar { display: flex; flex-direction: column; gap: 15px; width: 380px; flex-shrink: 0; background-color: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow-y: auto; height: 100%; }
+        
+        h2, h3 { color: #2c3e50; margin-top: 0; }
+        h2 { font-size: 1.3em; margin-bottom: 10px; border-bottom: 1px solid #e0e0e0; padding-bottom: 5px;}
+        h3 { font-size: 1.05em; margin-bottom: 8px; }
+
+        button { padding: 9px 15px; background-color: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.95em; transition: background-color 0.2s ease, transform 0.1s ease; }
+        button:hover { background-color: #2980b9; }
+        button:active { transform: translateY(1px); }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+        #coordinatesDisplay { padding: 10px; border: 1px solid #d1d5db; background-color: #f9fafb; border-radius: 5px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; font-size: 0.85em; max-height: 80px; overflow-y: auto; }
+        #statusMessage, #resultsStatusMessage, #verificationStatusMessage { margin-top: 8px; padding: 8px; border-radius: 4px; text-align: center; font-weight: 500; font-size: 0.9em; }
+        .status-success { background-color: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
+        .status-error { background-color: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; }
+        .status-info { background-color: #e0f2fe; border: 1px solid #7dd3fc; color: #075985; }
+        .status-pending { background-color: #fef3c7; border: 1px solid #fde047; color: #713f12; }
+
+        .charts-container { display: flex; flex-direction: column; gap: 15px; margin-top: 10px; }
+        .chart-wrapper { background-color: #fdfdfd; padding: 10px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+        .chart-wrapper canvas { max-width: 100%; height: auto !important; /* Important for Chart.js sizing */ }
+
+        .leaflet-popup-content button { margin: 2px; padding: 4px 7px; font-size: 0.8em; }
+        .popup-button-match { background-color: #2ecc71; } .popup-button-match:hover { background-color: #27ae60; }
+        .popup-button-nomatch { background-color: #e74c3c; } .popup-button-nomatch:hover { background-color: #c0392b; }
+        .popup-details { max-height: 180px; overflow-y: auto; font-size: 0.85em;}
+
+        /* Table View Styles */
+        #table-view-content { padding: 15px; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 100%;}
+        .filters-container { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap; }
+        .filters-container label { font-weight: 500; margin-right: 5px; }
+        .filters-container input[type="text"], .filters-container select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; }
+        #resultsTableContainer { flex-grow: 1; overflow: auto; border: 1px solid #ddd; border-radius: 4px;}
+        #resultsTable { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        #resultsTable th, #resultsTable td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        #resultsTable th { background-color: #f2f2f2; cursor: pointer; }
+        #resultsTable tr:nth-child(even) { background-color: #f9f9f9; }
+        #resultsTable tr:hover { background-color: #e6f7ff; }
+    </style>
+</head>
+<body>
+    <div class="top-bar"><h1>Geo-Spatial Matching Tool</h1></div>
+    <div class="tab-container">
+        <button class="tab-button active" onclick="openTab(event, 'mapViewTab')">🗺️ Map View & Controls</button>
+        <button class="tab-button" onclick="openTab(event, 'tableViewTab')">📊 Results Table</button>
+    </div>
+
+    <div id="mapViewTab" class="tab-content active">
+        <div class="main-layout">
+             <div id="map-view-content">
+                <div id="map"></div>
+                <div class="sidebar">
+                    <section>
+                        <h2>1. Select Area</h2>
+                        <div>
+                            <h3>Bounding Box:</h3>
+                            <div id="coordinatesDisplay">Draw rectangle on map.</div>
+                        </div>
+                        <button id="downloadDataButton" disabled>Download Data & Start Matching</button>
+                        <div id="statusMessage"></div>
+                    </section>
+                    <hr>
+                    <section>
+                        <h2>2. Review Matches</h2>
+                        <button id="loadResultsButton" disabled>Load/Refresh Match Results</button>
+                        <div id="resultsStatusMessage"></div>
+                        <p style="font-size: 0.8em; color: #555;">Matched: Green/Yellow/Red. Unmatched OSM: Blue.</p>
+                    </section>
+                    <hr>
+                    <section>
+                        <h2>3. Statistics</h2>
+                        <div id="verificationStatusMessage"></div>
+                        <div class="charts-container">
+                            <div class="chart-wrapper"><h3>Overall Match Status</h3><canvas id="overallMatchChart"></canvas></div>
+                            <div class="chart-wrapper"><h3>Matches by Confidence</h3><canvas id="confidenceLevelChart"></canvas></div>
+                            <div class="chart-wrapper"><h3>Matches by Reason (Conf. > 0)</h3><canvas id="matchReasonChart"></canvas></div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tableViewTab" class="tab-content">
+        <div id="table-view-content">
+            <h2>Match Results Table</h2>
+            <div class="filters-container">
+                <label for="filterOsmName">OSM Name:</label>
+                <input type="text" id="filterOsmName" placeholder="Filter OSM Name...">
+                <label for="filterOvertureName">OVT Name:</label>
+                <input type="text" id="filterOvertureName" placeholder="Filter Overture Name...">
+                <label for="filterConfidence">Confidence:</label>
+                <select id="filterConfidence">
+                    <option value="">All</option>
+                    <option value="3">3 (Green)</option>
+                    <option value="2">2 (Yellow)</option>
+                    <option value="1">1 (Red)</option>
+                    <option value="0">0 (No Match/Blue)</option>
+                </select>
+                <button id="applyTableFiltersButton">Apply Filters</button>
+                <button id="resetTableFiltersButton">Reset Filters</button>
+            </div>
+            <div id="resultsTableContainer">
+                <table id="resultsTable">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+             <p style="font-size: 0.8em; color: #555; margin-top:10px;">Click table headers to sort.</p>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        var map, drawnItems, matchMarkersLayer;
+        var currentBounds = null, currentRunDirectory = null, matchDataCache = [], filteredMatchData = [];
+        var overallMatchChartInstance, confidenceLevelChartInstance, matchReasonChartInstance;
+        
+        var downloadDataButton = document.getElementById('downloadDataButton');
+        var coordinatesDisplay = document.getElementById('coordinatesDisplay');
+        var statusMessageDiv = document.getElementById('statusMessage');
+        var loadResultsButton = document.getElementById('loadResultsButton');
+        var resultsStatusMessageDiv = document.getElementById('resultsStatusMessage');
+        var verificationStatusMessageDiv = document.getElementById('verificationStatusMessage');
+        var tableBody = document.getElementById('resultsTable').getElementsByTagName('tbody')[0];
+        var tableHead = document.getElementById('resultsTable').getElementsByTagName('thead')[0];
+
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) tabcontent[i].style.display = "none";
+            tablinks = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tablinks.length; i++) tablinks[i].className = tablinks[i].className.replace(" active", "");
+            document.getElementById(tabName).style.display = "flex"; // Use flex for active tab
+            evt.currentTarget.className += " active";
+            if (tabName === 'mapViewTab' && map) map.invalidateSize(); // Ensure map resizes correctly
+        }
+        document.addEventListener('DOMContentLoaded', () => { /* Initial tab setup */ openTab({currentTarget: document.querySelector('.tab-button.active')}, 'mapViewTab'); });
+
+
+        function initializeMap() {
+            map = L.map('map').setView([20, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+            drawnItems = new L.FeatureGroup().addTo(map);
+            matchMarkersLayer = L.layerGroup().addTo(map);
+            new L.Control.Draw({ edit: { featureGroup: drawnItems }, draw: { polygon: false, polyline: false, circle: false, marker: false, circlemarker: false, rectangle: { shapeOptions: { color: '#e74c3c' } } } }).addTo(map);
+            map.on(L.Draw.Event.CREATED, e => { drawnItems.clearLayers().addLayer(e.layer); currentBounds = e.layer.getBounds(); updateCoordinatesDisplay(currentBounds); setStatusMessage("Bounding box created.", "info"); });
+            map.on(L.Draw.Event.EDITED, e => e.layers.eachLayer(l => { if (l instanceof L.Rectangle) { currentBounds = l.getBounds(); updateCoordinatesDisplay(currentBounds); setStatusMessage("Bounding box updated.", "info");} }));
+            map.on(L.Draw.Event.DELETED, () => { if (drawnItems.getLayers().length === 0) { currentBounds = null; updateCoordinatesDisplay(null); setStatusMessage("Bounding box removed.", "info"); }});
+        }
+
+        function updateCoordinatesDisplay(bounds) {
+            downloadDataButton.disabled = !bounds;
+            coordinatesDisplay.textContent = bounds ? `NE: (${bounds.getNorthEast().lat.toFixed(6)}, ${bounds.getNorthEast().lng.toFixed(6)})\nSW: (${bounds.getSouthWest().lat.toFixed(6)}, ${bounds.getSouthWest().lng.toFixed(6)})` : "Draw rectangle on map.";
+        }
+
+        function setStatusMessage(message, type, elementId = 'statusMessage') {
+            const el = document.getElementById(elementId);
+            if(el){ el.textContent = message; el.className = 'status-' + type; if (type === 'success' || type === 'info') setTimeout(() => { if (el.textContent === message) el.textContent = ''; el.className = ''; }, 7000); }
+        }
+
+        downloadDataButton.addEventListener('click', function() { /* ... (same as before) ... */ 
+            if (!currentBounds) { setStatusMessage("Error: No bounding box selected.", "error"); return; }
+            var ne = currentBounds.getNorthEast(), sw = currentBounds.getSouthWest();
+            var bboxCoords = { min_lon: sw.lng, min_lat: sw.lat, max_lon: ne.lng, max_lat: ne.lat };
+            setStatusMessage("Initiating data download & matching...", "info");
+            downloadDataButton.disabled = true; loadResultsButton.disabled = true;
+
+            fetch('/trigger_download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(bboxCoords) })
+            .then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(new Error(err.message || `Server error: ${res.status}`))))
+            .then(data => {
+                setStatusMessage(data.message || "Process started!", "success");
+                if (data.run_directory) {
+                    currentRunDirectory = data.run_directory; loadResultsButton.disabled = false;
+                    setStatusMessage(`Run: ${currentRunDirectory}. Click 'Load Results' when matching is likely complete.`, "info", "resultsStatusMessage");
+                }
+            })
+            .catch(err => { setStatusMessage(`Error: ${err.message}`, "error"); })
+            .finally(() => { if(currentBounds) downloadDataButton.disabled = false; });
+        });
+
+        loadResultsButton.addEventListener('click', function() { /* ... (same as before, calls populateTable) ... */ 
+            if (!currentRunDirectory) { setStatusMessage("No active run. Download data first.", "error", "resultsStatusMessage"); return; }
+            setStatusMessage("Loading match results...", "info", "resultsStatusMessage");
+            fetch(`/get_match_results?run_dir=${currentRunDirectory}`)
+            .then(res => res.ok ? res.text() : res.json().then(err => Promise.reject(new Error(err.message || (res.status === 404 ? "Results not found or pending." : `Server error: ${res.status}`)))))
+            .then(csvText => Papa.parse(csvText, { header: true, skipEmptyLines: true, dynamicTyping: true, complete: res => {
+                if (res.errors.length) { console.error("CSV Errors:", res.errors); setStatusMessage("Error parsing results.", "error", "resultsStatusMessage"); return; }
+                matchDataCache = res.data; 
+                filteredMatchData = [...matchDataCache]; // Initialize filtered data
+                console.log("Match Data:", matchDataCache);
+                setStatusMessage(`Loaded ${matchDataCache.length} records.`, "success", "resultsStatusMessage");
+                plotMatchMarkers(matchDataCache); 
+                updateStatsAndCharts(matchDataCache);
+                populateTable(filteredMatchData); // Populate table with all data initially
+                setupTableSorting();
+            }}))
+            .catch(err => { setStatusMessage(`Error: ${err.message}`, "error", "resultsStatusMessage"); });
+        });
+
+        function verifyMatch(osm_id, overture_id, osm_name, overture_name, isMatch) { /* ... (same as before) ... */ 
+            const status = isMatch ? "verified_match" : "verified_non_match";
+            setStatusMessage("Saving verification...", "info", "verificationStatusMessage");
+            const payload = { osm_id: String(osm_id), overture_id: String(overture_id || ''), osm_name_original: osm_name, overture_name_original: overture_name, verified_status: status }; // Ensure overture_id is string even if null
+            fetch('/save_verification', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+            .then(res => res.json()).then(data => {
+                if (data.status === 'success') setStatusMessage("Verification saved!", "success", "verificationStatusMessage");
+                else throw new Error(data.message || "Failed to save.");
+            }).catch(err => setStatusMessage(`Error: ${err.message}`, "error", "verificationStatusMessage"));
+        }
+        
+        function plotMatchMarkers(data) {
+            matchMarkersLayer.clearLayers();
+            if (!data || data.length === 0) return;
+
+            data.forEach(row => {
+                if (row.osm_lat == null || row.osm_lon == null) return;
+
+                let markerColor = '#3498db'; // Default Blue for unmatched OSM points
+                let popupContent = '';
+                const confidence = parseInt(row.match_confidence_level, 10); // Ensure it's a number
+                const isActuallyMatched = confidence > 0 && row.overture_id != null;
+
+
+                if (isActuallyMatched) { // Matched Point
+                    if (confidence === 3) markerColor = '#2ecc71'; // Green
+                    else if (confidence === 2) markerColor = '#f1c40f'; // Yellow
+                    else if (confidence === 1) markerColor = '#e74c3c'; // Red
+                    
+                    popupContent = `<div class="popup-details">
+                        <b>OSM:</b> ${row.osm_name_original || 'N/A'} (ID: ${row.osm_id})<br>
+                        <b>OVT:</b> ${row.overture_name_original || 'N/A'} (ID: ${row.overture_id})<br>
+                        <b>Conf:</b> ${confidence} (${row.match_confidence_reason || 'N/A'})<br>
+                        <b>Dist (m):</b> ${row.distance_m != null ? row.distance_m : 'N/A'}<br><hr>
+                        <button class="popup-button-match" onclick="verifyMatch('${String(row.osm_id).replace(/'/g, "\\'")}', '${String(row.overture_id).replace(/'/g, "\\'")}', '${String(row.osm_name_original || '').replace(/'/g, "\\'")}', '${String(row.overture_name_original || '').replace(/'/g, "\\'")}', true)">✔️ Verified Match</button>
+                        <button class="popup-button-nomatch" onclick="verifyMatch('${String(row.osm_id).replace(/'/g, "\\'")}', '${String(row.overture_id).replace(/'/g, "\\'")}', '${String(row.osm_name_original || '').replace(/'/g, "\\'")}', '${String(row.overture_name_original || '').replace(/'/g, "\\'")}', false)">❌ Not a Match</button>
+                        </div>`;
+                } else { // Unmatched OSM Point (Confidence == 0 or no overture_id)
+                    popupContent = `<div class="popup-details">
+                        <b>OSM:</b> ${row.osm_name_original || 'N/A'} (ID: ${row.osm_id})<br>
+                        <b>Status:</b> ${row.match_confidence_reason || "No confident match found."}
+                        </div>`;
+                    // No verification buttons if it's just an unmatched OSM point without a specific Overture counterpart being displayed in this context
+                }
+                
+                L.circleMarker([row.osm_lat, row.osm_lon], { radius: 7, fillOpacity: 0.8, weight: 1, color: "#000", fillColor: markerColor })
+                 .addTo(matchMarkersLayer).bindPopup(popupContent);
+            });
+            if (matchMarkersLayer.getLayers().length > 0) {
+                try { map.fitBounds(matchMarkersLayer.getBounds().pad(0.1)); } catch (e) { console.warn("Could not fit map to bounds:", e); }
+            }
+        }
+        
+        function updateStatsAndCharts(data) { /* ... (same as before) ... */ 
+            destroyChart(overallMatchChartInstance); overallMatchChartInstance = null;
+            destroyChart(confidenceLevelChartInstance); confidenceLevelChartInstance = null;
+            destroyChart(matchReasonChartInstance); matchReasonChartInstance = null;
+            if (!data || data.length === 0) return;
+
+            const totalConsidered = data.length;
+            const actualMatches = data.filter(r => r.match_confidence_level > 0 && r.overture_id != null).length; // Count only actual pairs
+            renderPieChart('overallMatchChart', {
+                labels: ['Matched Pairs', 'OSM Unmatched/No Pair'],
+                datasets: [{ data: [actualMatches, totalConsidered - actualMatches], backgroundColor: ['#2ecc71', '#3498db'] }] 
+            }, overallMatchChartInstance, i => overallMatchChartInstance = i);
+
+            const confCounts = { '1 (Red)': 0, '2 (Yellow)': 0, '3 (Green)': 0 };
+            data.forEach(r => {
+                if (r.match_confidence_level === 1 && r.overture_id != null) confCounts['1 (Red)']++;
+                else if (r.match_confidence_level === 2 && r.overture_id != null) confCounts['2 (Yellow)']++;
+                else if (r.match_confidence_level === 3 && r.overture_id != null) confCounts['3 (Green)']++;
+            });
+            renderPieChart('confidenceLevelChart', {
+                labels: Object.keys(confCounts),
+                datasets: [{ data: Object.values(confCounts), backgroundColor: ['#e74c3c', '#f1c40f', '#2ecc71'] }]
+            }, confidenceLevelChartInstance, i => confidenceLevelChartInstance = i);
+
+            const reasonCounts = {};
+            data.filter(r => r.match_confidence_level > 0 && r.overture_id != null).forEach(r => {
+                const reason = r.match_confidence_reason || "Unknown";
+                reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+            });
+            if (Object.keys(reasonCounts).length > 0) {
+                renderPieChart('matchReasonChart', {
+                    labels: Object.keys(reasonCounts),
+                    datasets: [{ data: Object.values(reasonCounts), backgroundColor: generateRandomColors(Object.keys(reasonCounts).length) }]
+                }, matchReasonChartInstance, i => matchReasonChartInstance = i);
+            }
+        }
+
+        function destroyChart(instance) { if (instance) instance.destroy(); }
+        function renderPieChart(id, data, instance, cb) { /* ... (same as before) ... */ 
+            destroyChart(instance);
+            const newInstance = new Chart(document.getElementById(id).getContext('2d'), {
+                type: 'pie', data: data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => {
+                    let l = c.label || ''; if(l) l+=': '; if(c.parsed !== null) { l+=c.parsed; const t = c.dataset.data.reduce((a,v)=>a+v,0); l+=` (${t>0?((c.parsed/t)*100).toFixed(1):0}%)`; } return l;
+                }}}}}
+            });
+            if (cb) cb(newInstance);
+        }
+        function generateRandomColors(count) { /* ... (same as before) ... */ 
+            const c = []; for (let i=0; i<count; i++) c.push(`hsl(${(i*(360/count))%360}, 70%, 60%)`); return c;
+        }
+
+        // --- Table View Logic ---
+        function populateTable(data) {
+            tableHead.innerHTML = ''; // Clear existing headers
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            if (!data || data.length === 0) {
+                const row = tableBody.insertRow();
+                const cell = row.insertCell();
+                // Determine number of expected columns for colspan, or use a reasonable default
+                const expectedCols = (matchDataCache.length > 0 && Object.keys(matchDataCache[0]).length > 0) ? Object.keys(matchDataCache[0]).length : 10;
+                cell.colSpan = expectedCols;
+                cell.textContent = 'No data to display.';
+                cell.style.textAlign = 'center';
+                return;
+            }
+            
+            // Define which columns to display and their order
+            const displayColumns = [
+                'osm_id', 'osm_name_original', 'osm_name_globally_cleaned',
+                'overture_id', 'overture_name_original', 'overture_name_globally_cleaned',
+                'distance_m', 'fuzzy_score', 
+                'xg_match', 'xg_confidence', 
+                'st_similarity', 'st_match',
+                'llm_called', 'llm_match',
+                'match_confidence_level', 'match_confidence_reason',
+                'osm_lat', 'osm_lon', 'overture_lat', 'overture_lon'
+            ];
+            
+            // Create header row
+            const headerRow = tableHead.insertRow();
+            displayColumns.forEach(key => {
+                if (data[0].hasOwnProperty(key)) { // Check if key exists in data to avoid errors
+                    const th = document.createElement('th');
+                    th.textContent = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // Prettify header
+                    th.dataset.column = key; // For sorting
+                    headerRow.appendChild(th);
+                }
+            });
+
+            // Create data rows
+            data.forEach(item => {
+                const row = tableBody.insertRow();
+                displayColumns.forEach(key => {
+                     if (data[0].hasOwnProperty(key)) {
+                        const cell = row.insertCell();
+                        cell.textContent = item[key] !== null && item[key] !== undefined ? item[key] : '';
+                    }
+                });
+            });
+        }
+
+        let sortDirections = {};
+        function setupTableSorting() {
+            if (!tableHead.rows[0]) return;
+            tableHead.rows[0].querySelectorAll('th').forEach(th => {
+                th.addEventListener('click', () => {
+                    const column = th.dataset.column;
+                    sortDirections[column] = !(sortDirections[column] || false); // Toggle direction
+                    sortTable(column, sortDirections[column]);
+                });
+            });
+        }
+
+        function sortTable(column, ascending) {
+            const rowsArray = Array.from(tableBody.rows);
+            rowsArray.sort((a, b) => {
+                const cellA = a.cells[XGBOOST_FEATURE_NAMES.indexOf(column) > -1 ? XGBOOST_FEATURE_NAMES.indexOf(column) : Array.from(tableHead.rows[0].cells).findIndex(th => th.dataset.column === column)]; // Find index dynamically
+                const cellB = b.cells[XGBOOST_FEATURE_NAMES.indexOf(column) > -1 ? XGBOOST_FEATURE_NAMES.indexOf(column) : Array.from(tableHead.rows[0].cells).findIndex(th => th.dataset.column === column)];
+                
+                if (!cellA || !cellB) return 0;
+
+                const valA = cellA.textContent.trim();
+                const valB = cellB.textContent.trim();
+
+                // Attempt to convert to number for sorting, otherwise string sort
+                const numA = parseFloat(valA);
+                const numB = parseFloat(valB);
+
+                let comparison = 0;
+                if (!isNaN(numA) && !isNaN(numB)) {
+                    comparison = numA - numB;
+                } else {
+                    comparison = valA.localeCompare(valB);
+                }
+                return ascending ? comparison : -comparison;
+            });
+            rowsArray.forEach(row => tableBody.appendChild(row));
+        }
+
+
+        document.getElementById('applyTableFiltersButton').addEventListener('click', applyTableFilters);
+        document.getElementById('resetTableFiltersButton').addEventListener('click', resetTableFilters);
+
+        function applyTableFilters() {
+            const osmNameFilter = document.getElementById('filterOsmName').value.toLowerCase();
+            const overtureNameFilter = document.getElementById('filterOvertureName').value.toLowerCase();
+            const confidenceFilter = document.getElementById('filterConfidence').value;
+
+            filteredMatchData = matchDataCache.filter(item => {
+                const osmName = String(item.osm_name_original || '').toLowerCase();
+                const overtureName = String(item.overture_name_original || '').toLowerCase();
+                const confidence = String(item.match_confidence_level);
+
+                return (osmNameFilter === '' || osmName.includes(osmNameFilter)) &&
+                       (overtureNameFilter === '' || overtureName.includes(overtureNameFilter)) &&
+                       (confidenceFilter === '' || confidence === confidenceFilter);
+            });
+            populateTable(filteredMatchData);
+        }
+
+        function resetTableFilters() {
+            document.getElementById('filterOsmName').value = '';
+            document.getElementById('filterOvertureName').value = '';
+            document.getElementById('filterConfidence').value = '';
+            filteredMatchData = [...matchDataCache];
+            populateTable(filteredMatchData);
+        }
+
+
+        document.addEventListener('DOMContentLoaded', () => { 
+            initializeMap(); 
+            updateCoordinatesDisplay(null); 
+            updateStatsAndCharts([]); 
+            openTab({currentTarget: document.querySelector('.tab-button')}, 'mapViewTab'); // Ensure first tab is active
+            populateTable([]); // Initialize empty table
+        });
+    </script>
+</body>
+</html>

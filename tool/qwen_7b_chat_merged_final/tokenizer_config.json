@@ -1,0 +1,12 @@
+{
+  "added_tokens_decoder": {},
+  "auto_map": {
+    "AutoTokenizer": [
+      "Qwen/Qwen-7B-Chat--tokenization_qwen.QWenTokenizer",
+      null
+    ]
+  },
+  "clean_up_tokenization_spaces": false,
+  "model_max_length": 32768,
+  "tokenizer_class": "QWenTokenizer"
+}

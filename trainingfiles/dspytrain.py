@@ -17,7 +17,7 @@ MISTRAL_LOCAL_MODEL_PATH = r"mistral_models/7B-Instruct-v0.3"
 
 # OpenAI (Teacher Model) Configuration
 # IMPORTANT: REPLACE WITH YOUR ACTUAL OPENAI API KEY IF DIFFERENT
-OPENAI_API_KEY = "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" # User-provided key
+OPENAI_API_KEY = "" # User-provided key
 OPENAI_TEACHER_MODEL_NAME = "gpt-4o-mini" # Model for prompt_model in optimizer
 
 # General Configuration
@@ -158,8 +158,8 @@ def main():
     print("✅ Mistral Student LM for DSPy configured.")
 
     # Teacher Model (OpenAI)
-    if not OPENAI_API_KEY or "YOUR_OPENAI_API_KEY" in OPENAI_API_KEY or OPENAI_API_KEY == "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":
-        if OPENAI_API_KEY == "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":
+    if not OPENAI_API_KEY or "YOUR_OPENAI_API_KEY" in OPENAI_API_KEY or OPENAI_API_KEY == "":
+        if OPENAI_API_KEY == "":
             print(f"ℹ️ Using OpenAI API key provided: {OPENAI_API_KEY[:10]}...")
         else:
             print("🔴 CRITICAL ERROR: OPENAI_API_KEY is a placeholder. Please set your actual key.")

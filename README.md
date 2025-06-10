@@ -1,6 +1,6 @@
 # Project_A-Unique-Gers-Id
 Welcome to the name matcher tool
-All the files required to run the application are in the tool folder. Be sure to run the flask_back_end.py and open the link
+All the files required to run the application are in the tool folder. Be sure to run the flask_back_end.py and open the link. Also, be sure to download all the required dependencies specified by the requirements.txt
 
 Warning: the tool will download large amounts of data depending on the size of your bounding box. The tools use three model architectures: Xgboost, Sentence Transformers, and Qwen7b
 

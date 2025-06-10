@@ -5,4 +5,5 @@ Warning: the tool will download large amounts of data depending on the size of y
 To train these models with your own data refer to the training files folder
 
 Demo: https://youtu.be/T3QkpWgfuJs
+Contact: rverma8@ucsc.edu
 

@@ -1,0 +1,24 @@
+# Web Backend
+Flask
+Flask-Cors
+
+# Geospatial and Data Handling
+geopandas
+osmnx
+overturemaps
+pandas
+numpy
+shapely
+
+# Machine Learning & AI Models
+torch
+transformers
+sentence-transformers
+xgboost
+joblib
+rapidfuzz
+bitsandbytes
+accelerate
+
+# Utilities
+requests
